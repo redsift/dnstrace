@@ -199,10 +199,10 @@ func do(ctx context.Context) []*rstats {
 					}
 
 					start := time.Now()
-					//co.SetWriteDeadline(start.Add(*pWriteTimeout))
+					co.SetWriteDeadline(start.Add(*pWriteTimeout))
 					// print msg stdout
-					fmt.Printf("MSG:\n")
-					fmt.Printf("%+v\n", m)
+					//fmt.Printf("MSG:\n")
+					//fmt.Printf("%+v\n", m)
 					if err = co.WriteMsg(&m); err != nil {
 						// error writing
 						atomic.AddInt64(&ecount, 1)
