@@ -38,7 +38,7 @@ var (
 	pCount       = pApp.Flag("number", "Number of queries to issue. Note that the total number of queries issued = number*concurrency*len(queries).").Short('n').Default("1").Int64()
 	pConcurrency = pApp.Flag("concurrency", "Number of concurrent queries to issue.").Short('c').Default("1").Uint32()
 	pRate        = pApp.Flag("rate-limit", "Apply a global questions / second rate limit.").Short('l').Default("0").Int()
-	pQperConn     = pApp.Flag("query-per-conn", "Queries on a connection before creating a new one. 0: unlimited").Default("0").Int64()
+	pQperConn    = pApp.Flag("query-per-conn", "Queries on a connection before creating a new one. 0: unlimited").Default("0").Int64()
 
 	pExpect = pApp.Flag("expect", "Expect a specific response.").Short('e').Strings()
 
@@ -156,30 +156,22 @@ func do(ctx context.Context) []*rstats {
 			}()
 
 			var r *dns.Msg
-			m := new(dns.Msg)
-			m.RecursionDesired = *pRecurse
-			m.Question = make([]dns.Question, 1)
-			question := dns.Question{"", qType, dns.ClassINET}
-
-			// create a new lock free rand source for this goroutine
-			rando := rand.New(rand.NewSource(time.Now().Unix()))
-
+			var m dns.Msg
 			var i int64
 			for i = 0; i < *pCount; i++ {
 				for _, q := range questions {
 					if ctx.Err() != nil {
 						return
 					}
-					if co!=nil && *pQperConn>0 && i%*pQperConn==0 {
+					if co != nil && *pQperConn > 0 && i%*pQperConn == 0 {
 						co.Close()
 						co = nil
 					}
 					atomic.AddInt64(&count, 1)
 
 					// instead of setting the question, do this manually for lower overhead and lock free access to id
-					question.Name = q
-					m.Id = uint16(rando.Uint32())
-					m.Question[0] = question
+					m.SetQuestion(q, qType)
+					//m.RecursionDesired = *pRecurse
 
 					if co == nil {
 						co, err = dns.DialTimeout(network, srv, dnsTimeout)
@@ -203,7 +195,10 @@ func do(ctx context.Context) []*rstats {
 
 					start := time.Now()
 					co.SetWriteDeadline(start.Add(*pWriteTimeout))
-					if err = co.WriteMsg(m); err != nil {
+					// print msg stdout
+					//fmt.Printf("MSG:\n")
+					//fmt.Printf("%+v\n", m)
+					if err = co.WriteMsg(&m); err != nil {
 						// error writing
 						atomic.AddInt64(&ecount, 1)
 						if *pIOErrors {
@@ -291,7 +286,6 @@ func printProgress() {
 	}
 
 	fmt.Println()
-
 
 	errorFprint := color.New(color.FgRed).Fprint
 	successFprint := color.New(color.FgGreen).Fprint
