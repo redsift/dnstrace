@@ -14,5 +14,7 @@ require (
 	github.com/miekg/dns v0.0.0-20170812192144-0598bd43cf51
 	github.com/olekukonko/tablewriter v0.0.0-20170719101040-be5337e7b39e
 	go.uber.org/ratelimit v0.0.0-20161026005643-d15fa2e2a63d
-	golang.org/x/sys v0.0.0-20170213225739-e24f485414ae
+	golang.org/x/sys v0.0.0-20210303074136-134d130e1a04
 )
+
+replace github.com/miekg/dns => /home/tonymet/go/src/github.com/miekg/dns
