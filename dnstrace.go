@@ -1,25 +1,20 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
-	"time"
-
 	"os"
-
+	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
-
-	"strconv"
-
 	"syscall"
+	"time"
 
-	"context"
-	"os/signal"
-
+	"github.com/HdrHistogram/hdrhistogram-go"
 	"github.com/alecthomas/kingpin"
-	"github.com/codahale/hdrhistogram"
 	"github.com/fatih/color"
 	"github.com/miekg/dns"
 	"github.com/olekukonko/tablewriter"
