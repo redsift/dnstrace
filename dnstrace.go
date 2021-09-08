@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+	"bufio"
+	"encoding/json"
 
 	"github.com/HdrHistogram/hdrhistogram-go"
 	"github.com/alecthomas/kingpin"
@@ -56,13 +58,15 @@ var (
 	pHistPre     = pApp.Flag("precision", "Significant figure for histogram precision.").Default("1").PlaceHolder("[1-5]").Int()
 	pHistDisplay = pApp.Flag("distribution", "Display distribution histogram of timings to stdout.").Default("true").Bool()
 	pCsv         = pApp.Flag("csv", "Export distribution to CSV.").Default("").PlaceHolder("/path/to/file.csv").String()
+	pJson        = pApp.Flag("json-stats", "Export stats to json file.").Default("").PlaceHolder("/path/to/file.json").String()
 
 	pIOErrors = pApp.Flag("io-errors", "Log I/O errors to stderr.").Default("false").Bool()
 
 	pSilent = pApp.Flag("silent", "Disable stdout.").Default("false").Bool()
 	pColor  = pApp.Flag("color", "ANSI Color output.").Default("true").Bool()
+	pQueriesFile = pApp.Flag("queries-file", "File with queries, separated by newlines").Default("").PlaceHolder("/path/to/file.txt").String()
 
-	pQueries = pApp.Arg("queries", "Queries to issue.").Required().Strings()
+	pQueries = pApp.Arg("queries", "Queries to issue.").Strings()
 )
 
 var (
@@ -79,6 +83,14 @@ const dnsTimeout = time.Second * 4
 type rstats struct {
 	codes map[int]int64
 	hist  *hdrhistogram.Histogram
+}
+
+type StatObject struct {
+	Min float64
+	Max float64
+	Avg float64
+	Sd float64
+	QPS float64
 }
 
 func isExpected(a string) bool {
@@ -329,7 +341,7 @@ func printProgress() {
 
 }
 
-func printReport(t time.Duration, stats []*rstats, csv *os.File) {
+func printReport(t time.Duration, stats []*rstats, csv *os.File, jsonFile *os.File) {
 	defer func() {
 		if csv != nil {
 			csv.Close()
@@ -380,9 +392,9 @@ func printReport(t time.Duration, stats []*rstats, csv *os.File) {
 	}
 
 	fmt.Println()
-
+	qps := float64(count)/t.Seconds()
 	fmt.Println("Time taken for tests:\t", t.String())
-	fmt.Printf("Questions per second:\t %0.1f\n", float64(count)/t.Seconds())
+	fmt.Printf("Questions per second:\t %0.1f\n", qps)
 
 	min := time.Duration(timings.Min())
 	mean := time.Duration(timings.Mean())
@@ -406,6 +418,25 @@ func printReport(t time.Duration, stats []*rstats, csv *os.File) {
 			printBars(dist)
 		}
 
+	}
+
+	if jsonFile != nil {
+		stat := StatObject{
+			Min: float64(min) / float64(time.Millisecond),
+			Max: float64(max) / float64(time.Millisecond),
+			Avg: float64(mean) / float64(time.Millisecond),
+			Sd: float64(sd) / float64(time.Millisecond),
+			QPS: qps,
+		}
+
+		b, err := json.Marshal(stat)
+		if err != nil {
+			fmt.Println("error:", err)
+		} else {
+			fmt.Println("Writing stats to json file", b)
+			jsonFile.Write(b)
+		}
+		jsonFile.Close()
 	}
 
 }
@@ -468,6 +499,7 @@ const fileNoBuffer = 9 // app itself needs about 9 for libs
 
 func main() {
 	version := "unknown"
+
 	if Tag == "" {
 		if Commit != "" {
 			version = Commit
@@ -482,18 +514,8 @@ func main() {
 	// process args
 	color.NoColor = !*pColor
 
-	var rLimit syscall.Rlimit
-
-	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit); err == nil {
-		var needed uint64
-		needed = uint64(*pConcurrency) + uint64(fileNoBuffer)
-		if rLimit.Cur < needed {
-			fmt.Fprintf(os.Stderr, "current process limit for number of files is %d and insufficient for level of requested concurrency.\n", rLimit.Cur)
-			os.Exit(2)
-		}
-	}
-
 	var csv *os.File
+	var jsonFile *os.File
 	if *pCsv != "" {
 		f, err := os.Create(*pCsv)
 		if err != nil {
@@ -502,6 +524,16 @@ func main() {
 		}
 
 		csv = f
+	}
+
+	if *pJson != "" {
+		f, err := os.Create(*pJson)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(2)
+		}
+
+		jsonFile = f
 	}
 
 	sigsInt := make(chan os.Signal, 8)
@@ -528,6 +560,22 @@ func main() {
 			printProgress()
 		}
 	}()
+	if *pQueriesFile != "" {
+		fmt.Println("Opening file ", *pQueriesFile)
+		file, err := os.Open(*pQueriesFile)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "can't open queries file")
+			os.Exit(1)
+		}
+		scanner := bufio.NewScanner(file)
+
+		for scanner.Scan() {
+			*pQueries = append(*pQueries, scanner.Text())
+		}
+	} else if len(*pQueries) == 0 {
+		fmt.Fprintln(os.Stderr, "either queries or --query-file should be specified")
+		os.Exit(3)
+	}
 
 	// get going
 	rand.Seed(time.Now().UnixNano())
@@ -536,7 +584,7 @@ func main() {
 	res := do(ctx)
 	end := time.Now()
 
-	printReport(end.Sub(start), res, csv)
+	printReport(end.Sub(start), res, csv, jsonFile)
 
 	if cerror > 0 || ecount > 0 || mismatch > 0 {
 		// something was wrong
