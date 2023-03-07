@@ -14,7 +14,7 @@ require (
 	github.com/mattn/go-colorable v0.0.8-0.20170210172801-5411d3eea597 // indirect
 	github.com/mattn/go-isatty v0.0.2-0.20170307163044-57fdcb988a5c // indirect
 	github.com/mattn/go-runewidth v0.0.2 // indirect
-	github.com/miekg/dns v0.0.0-20170812192144-0598bd43cf51
+	github.com/miekg/dns v1.1.25
 	github.com/olekukonko/tablewriter v0.0.0-20170719101040-be5337e7b39e
 	github.com/sergi/go-diff v1.2.0 // indirect
 	go.uber.org/ratelimit v0.2.0
