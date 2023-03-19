@@ -44,7 +44,7 @@ var (
 
 	pRecurse = pApp.Flag("recurse", "Allow DNS recursion.").Short('r').Default("false").Bool()
 	pUdpSize = pApp.Flag("edns0", "Enable EDNS0 with specified size.").Default("0").Uint16()
-	pTCP     = pApp.Flag("tcp", "Use TCP fot DNS requests.").Default("false").Bool()
+	pTCP     = pApp.Flag("tcp", "Use TCP for DNS requests.").Default("false").Bool()
 
 	pWriteTimeout = pApp.Flag("write", "DNS write timeout.").Default("1s").Duration()
 	pReadTimeout  = pApp.Flag("read", "DNS read timeout.").Default(dnsTimeout.String()).Duration()

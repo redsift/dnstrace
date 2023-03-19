@@ -34,7 +34,7 @@ Flags:
   -e, --expect=EXPECT ...      Expect a specific response.
   -r, --recurse                Allow DNS recursion.
       --edns0=0                Enable EDNS0 with specified size.
-      --tcp                    Use TCP fot DNS requests.
+      --tcp                    Use TCP for DNS requests.
       --write=1s               DNS write timeout.
       --read=4s                DNS read timeout.
       --codes                  Enable counting DNS return codes.
